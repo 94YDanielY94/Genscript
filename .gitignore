@@ -2,9 +2,6 @@
 
 # dependencies
 /node_modules
-pnpm-lock.yaml
-yarn.lock
-package-lock.json
 
 # next.js
 /.next/
@@ -28,5 +25,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# Keep bun.lockb for Bun package management
