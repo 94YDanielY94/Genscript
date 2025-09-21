@@ -20,8 +20,10 @@ export function WordExport({ student }: WordExportProps) {
 
       const [
         { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, AlignmentType, BorderStyle, WidthType },
-        { saveAs },
+        fileSaver,
       ] = await Promise.all([import("docx"), import("file-saver")])
+
+      const saveAs = fileSaver.saveAs || fileSaver.default?.saveAs || fileSaver.default
 
       console.log("[v0] Libraries loaded successfully")
 
