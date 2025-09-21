@@ -211,7 +211,6 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
     "Economics",
     "Agriculture",
     "HPE",
-    "ICT",
   ]
 
   const handleKeyPress = (
@@ -295,6 +294,7 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
 
   const handleSave = (isPartial: boolean) => {
     setIsSaving(true)
+
     const updatedStudent = {
       ...student,
       grades,
@@ -302,6 +302,35 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
     }
     onSave(updatedStudent)
     setIsSaving(false)
+
+    // Show Grade Saved popup
+    const popup = document.createElement("div")
+    popup.innerHTML = `
+      <div style="
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        border: 2px solid #22c55e;
+        border-radius: 8px;
+        padding: 20px 40px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        z-index: 9999;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 18px;
+        font-weight: 600;
+        color: #16a34a;
+        text-align: center;
+      ">
+        ✓ Grade Saved
+      </div>
+    `
+    document.body.appendChild(popup)
+
+    setTimeout(() => {
+      document.body.removeChild(popup)
+    }, 2000)
   }
 
   if (!student) {

@@ -9,11 +9,13 @@
     "start": "bun run next start"
   },
   "dependencies": {
+    "@vercel/analytics": "latest",
     "bun": "1.2.22",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "docx": "latest",
     "file-saver": "latest",
+    "geist": "latest",
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
     "react": "^19",

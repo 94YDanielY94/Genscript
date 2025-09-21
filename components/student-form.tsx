@@ -22,6 +22,8 @@ export function StudentForm({ student, onSave }: StudentFormProps) {
     template: "G9-G12" as Student["template"],
   })
 
+  const [nameError, setNameError] = useState("")
+
   useEffect(() => {
     if (student) {
       setFormData({
@@ -40,6 +42,59 @@ export function StudentForm({ student, onSave }: StudentFormProps) {
     }
   }, [student])
 
+  const validateAndCapitalizeName = (name: string): { isValid: boolean; capitalizedName: string; error: string } => {
+    const trimmedName = name.trim()
+
+    // Check if name has at least 3 parts (first, middle, last)
+    const nameParts = trimmedName.split(/\s+/).filter((part) => part.length > 0)
+
+    if (nameParts.length < 3) {
+      return {
+        isValid: false,
+        capitalizedName: trimmedName,
+        error: "Please enter full name (First Middle Last)",
+      }
+    }
+
+    // Check if each part contains only letters
+    const nameRegex = /^[a-zA-Z]+$/
+    const invalidParts = nameParts.filter((part) => !nameRegex.test(part))
+
+    if (invalidParts.length > 0) {
+      return {
+        isValid: false,
+        capitalizedName: trimmedName,
+        error: "Name should contain only letters",
+      }
+    }
+
+    // Capitalize each part
+    const capitalizedName = nameParts
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(" ")
+
+    return {
+      isValid: true,
+      capitalizedName,
+      error: "",
+    }
+  }
+
+  const getAgeRestrictions = (template: Student["template"]): { min: number; max: number; schoolType: string } => {
+    switch (template) {
+      case "G9-G12":
+        return { min: 14, max: 19, schoolType: "High School (4 years)" }
+      case "G10-G12":
+        return { min: 15, max: 18, schoolType: "High School (3 years)" }
+      case "G11-G12":
+        return { min: 16, max: 18, schoolType: "High School (2 years)" }
+      case "G12":
+        return { min: 17, max: 19, schoolType: "Grade 12 Only" }
+      default:
+        return { min: 14, max: 19, schoolType: "High School" }
+    }
+  }
+
   const calculateAcademicYears = (template: Student["template"]): string => {
     const currentYear = new Date().getFullYear()
     const templateYears = {
@@ -53,6 +108,18 @@ export function StudentForm({ student, onSave }: StudentFormProps) {
     return `${startYear}-${currentYear}`
   }
 
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputName = e.target.value
+    setFormData((prev) => ({ ...prev, name: inputName }))
+
+    if (inputName.trim()) {
+      const validation = validateAndCapitalizeName(inputName)
+      setNameError(validation.error)
+    } else {
+      setNameError("")
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -61,17 +128,32 @@ export function StudentForm({ student, onSave }: StudentFormProps) {
       return
     }
 
+    const nameValidation = validateAndCapitalizeName(formData.name)
+    if (!nameValidation.isValid) {
+      setNameError(nameValidation.error)
+      return
+    }
+
+    const ageRestrictions = getAgeRestrictions(formData.template)
+    const age = Number.parseInt(formData.age)
+    if (age < ageRestrictions.min || age > ageRestrictions.max) {
+      alert(`Age must be between ${ageRestrictions.min} and ${ageRestrictions.max} for ${ageRestrictions.schoolType}`)
+      return
+    }
+
     const studentData: Student = {
       id: student?.id || Date.now().toString(),
-      name: formData.name,
+      name: nameValidation.capitalizedName, // Use capitalized name
       gender: formData.gender as "Male" | "Female",
-      age: Number.parseInt(formData.age),
+      age: age,
       template: formData.template,
       grades: student?.grades || [],
     }
 
     onSave(studentData)
   }
+
+  const currentAgeRestrictions = getAgeRestrictions(formData.template)
 
   return (
     <Card>
@@ -86,10 +168,13 @@ export function StudentForm({ student, onSave }: StudentFormProps) {
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter student's full name"
+                onChange={handleNameChange}
+                placeholder="Enter student's full name (First Middle Last)"
                 required
+                className={nameError ? "border-red-500" : ""}
               />
+              {nameError && <p className="text-sm text-red-500">{nameError}</p>}
+              <p className="text-xs text-muted-foreground">Must include first, middle, and last name</p>
             </div>
 
             <div className="space-y-2">
@@ -116,10 +201,14 @@ export function StudentForm({ student, onSave }: StudentFormProps) {
                 value={formData.age}
                 onChange={(e) => setFormData((prev) => ({ ...prev, age: e.target.value }))}
                 placeholder="Enter age"
-                min="1"
-                max="100"
+                min={currentAgeRestrictions.min}
+                max={currentAgeRestrictions.max}
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Age range for {currentAgeRestrictions.schoolType}: {currentAgeRestrictions.min}-
+                {currentAgeRestrictions.max} years
+              </p>
             </div>
 
             <div className="space-y-2">

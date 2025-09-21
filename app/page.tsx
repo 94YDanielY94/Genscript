@@ -11,13 +11,14 @@ import { DataManager } from "@/components/data-manager"
 import { PrintPreview } from "@/components/print-preview"
 import { FileManager } from "@/lib/file-manager"
 import { FileText, Users, Download, Upload, Search, Trash2 } from "lucide-react"
+import Image from "next/image"
 
 export interface Student {
   id: string
   name: string
   gender: "Male" | "Female"
   age: number
-  academicYears: string
+  academicYears?: string
   template: "G9-G12" | "G10-G12" | "G11-G12" | "G12"
   grades: {
     subject: string
@@ -27,10 +28,16 @@ export interface Student {
         semester2: number
         yearAvg: number
         total: number
-        conduct: string
       }
     }
   }[]
+  conduct?: {
+    [gradeLevel: string]: {
+      semester1: string
+      semester2: string
+      yearAvg: string
+    }
+  }
 }
 
 export default function TranscriptGenerator() {
@@ -84,6 +91,7 @@ export default function TranscriptGenerator() {
   }
 
   const selectStudent = (student: Student) => {
+    console.log("[v0] Selecting student:", student.name, "Gender:", student.gender, "Template:", student.template)
     setCurrentStudent(student)
     setActiveTab("form")
   }
@@ -143,8 +151,19 @@ export default function TranscriptGenerator() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Transcript Generator</h1>
-          <p className="text-muted-foreground">Create and manage student transcripts locally with Bun</p>
+          <div className="flex items-center gap-4 mb-4">
+            <Image
+              src="/icon-192.png"
+              alt="Transcript Generator"
+              width={48}
+              height={48}
+              className="rounded-lg shadow-sm"
+            />
+            <div>
+              <h1 className="text-4xl font-bold text-foreground mb-1">Transcript Generator</h1>
+              <p className="text-muted-foreground">Create and manage student transcripts locally</p>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">

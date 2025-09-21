@@ -1,5 +1,7 @@
 "use client"
 
+import React from "react"
+
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -18,6 +20,21 @@ export function PrintPreview({ student }: PrintPreviewProps) {
     window.print()
   }
 
+  const getGradeLevels = (template: string): string[] => {
+    switch (template) {
+      case "G9-G12":
+        return ["G9", "G10", "G11", "G12"]
+      case "G10-G12":
+        return ["G10", "G11", "G12"]
+      case "G11-G12":
+        return ["G11", "G12"]
+      case "G12":
+        return ["G12"]
+      default:
+        return ["G12"]
+    }
+  }
+
   const getGradeLevel = (template: string) => {
     switch (template) {
       case "G9-G12":
@@ -33,19 +50,48 @@ export function PrintPreview({ student }: PrintPreviewProps) {
     }
   }
 
-  const getOverallAverage = () => {
-    const validGrades = student.grades.filter((g) => g.average > 0)
-    if (validGrades.length === 0) return 0
-    return Math.round(validGrades.reduce((acc, g) => acc + g.average, 0) / validGrades.length)
+  const getGradeData = (subject: any, gradeLevel: string) => {
+    if (!subject || !subject.grades || !subject.grades[gradeLevel]) {
+      return { semester1: 0, semester2: 0, yearAvg: 0, total: 0 }
+    }
+    return subject.grades[gradeLevel]
   }
 
-  const getGradeStatus = (average: number) => {
-    if (average >= 90) return "Excellent"
-    if (average >= 80) return "Good"
-    if (average >= 70) return "Satisfactory"
-    if (average >= 60) return "Pass"
-    return "Needs Improvement"
+  const getConductData = (gradeLevel: string) => {
+    if (!student.conduct || !student.conduct[gradeLevel]) {
+      return { semester1: "A", semester2: "A", yearAvg: "A" }
+    }
+    return student.conduct[gradeLevel]
   }
+
+  const calculateTotals = (gradeLevel: string) => {
+    let sem1Total = 0,
+      sem2Total = 0,
+      yearAvgTotal = 0,
+      subjectCount = 0
+
+    student.grades?.forEach((subject) => {
+      const gradeData = getGradeData(subject, gradeLevel)
+      if (gradeData.semester1 > 0 || gradeData.semester2 > 0) {
+        sem1Total += gradeData.semester1
+        sem2Total += gradeData.semester2
+        yearAvgTotal += gradeData.yearAvg
+        subjectCount++
+      }
+    })
+
+    return {
+      sem1Total: sem1Total.toFixed(1),
+      sem2Total: sem2Total.toFixed(1),
+      yearAvgTotal: yearAvgTotal.toFixed(1),
+      sem1Avg: subjectCount > 0 ? (sem1Total / subjectCount).toFixed(1) : "0.0",
+      sem2Avg: subjectCount > 0 ? (sem2Total / subjectCount).toFixed(1) : "0.0",
+      yearAvgAvg: subjectCount > 0 ? (yearAvgTotal / subjectCount).toFixed(1) : "0.0",
+      subjectCount,
+    }
+  }
+
+  const gradeLevels = getGradeLevels(student.template)
 
   return (
     <div className="space-y-6">
@@ -72,8 +118,7 @@ export function PrintPreview({ student }: PrintPreviewProps) {
         </CardHeader>
         <CardContent>
           <div className="text-sm text-muted-foreground">
-            Preview your transcript before printing or exporting. The layout is optimized for standard letter-size paper
-            in landscape orientation.
+            Preview your transcript before printing or exporting. The layout is optimized for landscape orientation.
           </div>
         </CardContent>
       </Card>
@@ -84,156 +129,152 @@ export function PrintPreview({ student }: PrintPreviewProps) {
       {/* Print Preview */}
       {showPreview && (
         <div className="print-container">
-          <div className="transcript-page bg-white text-black p-8 shadow-lg mx-auto" style={{ width: "11in" }}>
-            {/* Header */}
-            <div className="text-center mb-8 border-b-2 border-black pb-4">
-              <h1 className="text-3xl font-bold mb-2">OFFICIAL TRANSCRIPT</h1>
-              <div className="text-lg">Academic Record</div>
+          <div
+            className="transcript-page bg-white text-black p-4 shadow-lg mx-auto"
+            style={{ width: "11in", minHeight: "8.5in" }}
+          >
+            {/* Header - Compact */}
+            <div className="text-center mb-3 border-b-2 border-black pb-2">
+              <h1 className="text-xl font-bold mb-1">OFFICIAL TRANSCRIPT</h1>
+              <div className="text-sm">Academic Record</div>
             </div>
 
-            {/* Student Information */}
-            <div className="grid grid-cols-2 gap-8 mb-8">
-              <div>
-                <h2 className="text-xl font-bold mb-4 border-b border-gray-400 pb-1">STUDENT INFORMATION</h2>
-                <div className="space-y-2">
-                  <div className="flex">
-                    <span className="font-semibold w-32">Name:</span>
-                    <span className="font-bold text-lg">{student.name}</span>
+            {/* Student Information - Horizontal Layout */}
+            <div className="mb-3 p-2 border border-gray-400 rounded">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6 text-sm">
+                  <div>
+                    <span className="font-semibold">Name:</span> <span className="font-bold">{student.name}</span>
                   </div>
-                  <div className="flex">
-                    <span className="font-semibold w-32">Gender:</span>
-                    <span>{student.gender}</span>
+                  <div>
+                    <span className="font-semibold">Gender:</span> {student.gender}
                   </div>
-                  <div className="flex">
-                    <span className="font-semibold w-32">Age:</span>
-                    <span>{student.age}</span>
+                  <div>
+                    <span className="font-semibold">Age:</span> {student.age}
                   </div>
-                  <div className="flex">
-                    <span className="font-semibold w-32">Academic Year:</span>
-                    <span>{student.academicYears}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="font-semibold w-32">Program:</span>
-                    <span>{getGradeLevel(student.template)}</span>
+                  <div>
+                    <span className="font-semibold">Program:</span> {getGradeLevel(student.template)}
                   </div>
                 </div>
-              </div>
-
-              {/* Photo Placeholder */}
-              <div className="flex justify-end">
-                <div className="w-32 h-40 border-2 border-gray-400 flex items-center justify-center bg-gray-50">
-                  <div className="text-center text-gray-500">
-                    <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-gray-300"></div>
-                    <div className="text-xs">Student Photo</div>
-                  </div>
+                <div className="w-12 h-16 border border-gray-400 flex items-center justify-center bg-gray-50 text-xs text-gray-500">
+                  Photo
                 </div>
               </div>
             </div>
 
-            {/* Academic Record */}
-            <div className="mb-8">
-              <h2 className="text-xl font-bold mb-4 border-b border-gray-400 pb-1">ACADEMIC RECORD</h2>
+            <div className="border border-black">
+              <div className="bg-gray-200 p-2 text-center font-bold text-sm border-b border-black">
+                ACADEMIC RECORD - {getGradeLevel(student.template)}
+              </div>
 
-              {student.grades.length > 0 ? (
-                <table className="w-full border-collapse border border-black">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border border-black p-3 text-left font-bold">SUBJECT</th>
-                      <th className="border border-black p-3 text-center font-bold">SEMESTER 1</th>
-                      <th className="border border-black p-3 text-center font-bold">SEMESTER 2</th>
-                      <th className="border border-black p-3 text-center font-bold">AVERAGE</th>
-                      <th className="border border-black p-3 text-center font-bold">STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {student.grades.map((grade, index) => (
-                      <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        <td className="border border-black p-3 font-medium">{grade.subject}</td>
-                        <td className="border border-black p-3 text-center font-mono">
-                          {grade.semester1 > 0 ? `${grade.semester1}%` : "-"}
-                        </td>
-                        <td className="border border-black p-3 text-center font-mono">
-                          {grade.semester2 > 0 ? `${grade.semester2}%` : "-"}
-                        </td>
-                        <td className="border border-black p-3 text-center font-mono font-bold">
-                          {grade.average > 0 ? `${grade.average}%` : "-"}
-                        </td>
-                        <td className="border border-black p-3 text-center text-sm">
-                          {grade.average > 0 ? getGradeStatus(grade.average) : "-"}
-                        </td>
-                      </tr>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border border-black p-1 text-left font-bold w-32">SUBJECT</th>
+                    {gradeLevels.map((gradeLevel) => (
+                      <th key={gradeLevel} className="border border-black p-1 text-center font-bold" colSpan={3}>
+                        {gradeLevel}
+                        {gradeLevel === "G11" && gradeLevels.includes("G12") && (
+                          <div className="text-xs text-green-700 font-normal">→ PROMOTED TO G12</div>
+                        )}
+                      </th>
                     ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="text-center py-8 text-gray-500">No grades recorded</div>
-              )}
+                  </tr>
+                  <tr className="bg-gray-50">
+                    <th className="border border-black p-1"></th>
+                    {gradeLevels.map((gradeLevel) => (
+                      <React.Fragment key={gradeLevel}>
+                        <th className="border border-black p-1 text-center font-bold text-xs">SEM1</th>
+                        <th className="border border-black p-1 text-center font-bold text-xs">SEM2</th>
+                        <th className="border border-black p-1 text-center font-bold text-xs">YR AVG</th>
+                      </React.Fragment>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {student.grades?.map((subject, subjectIndex) => (
+                    <tr key={subjectIndex} className={subjectIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      <td className="border border-black p-1 font-medium text-xs">{subject.subject}</td>
+                      {gradeLevels.map((gradeLevel) => {
+                        const gradeData = getGradeData(subject, gradeLevel)
+                        return (
+                          <React.Fragment key={gradeLevel}>
+                            <td className="border border-black p-1 text-center font-mono text-xs">
+                              {gradeData.semester1 > 0 ? gradeData.semester1.toFixed(1) : "-"}
+                            </td>
+                            <td className="border border-black p-1 text-center font-mono text-xs">
+                              {gradeData.semester2 > 0 ? gradeData.semester2.toFixed(1) : "-"}
+                            </td>
+                            <td className="border border-black p-1 text-center font-mono font-bold text-xs">
+                              {gradeData.yearAvg > 0 ? gradeData.yearAvg.toFixed(1) : "-"}
+                            </td>
+                          </React.Fragment>
+                        )
+                      })}
+                    </tr>
+                  ))}
+
+                  {/* Totals Row */}
+                  <tr className="bg-yellow-100 font-bold">
+                    <td className="border border-black p-1 font-bold text-xs">TOTALS</td>
+                    {gradeLevels.map((gradeLevel) => {
+                      const totals = calculateTotals(gradeLevel)
+                      return (
+                        <React.Fragment key={gradeLevel}>
+                          <td className="border border-black p-1 text-center font-mono text-xs">{totals.sem1Total}</td>
+                          <td className="border border-black p-1 text-center font-mono text-xs">{totals.sem2Total}</td>
+                          <td className="border border-black p-1 text-center font-mono text-xs">
+                            {totals.yearAvgTotal}
+                          </td>
+                        </React.Fragment>
+                      )
+                    })}
+                  </tr>
+
+                  {/* Averages Row */}
+                  <tr className="bg-blue-100 font-bold">
+                    <td className="border border-black p-1 font-bold text-xs">AVERAGES</td>
+                    {gradeLevels.map((gradeLevel) => {
+                      const totals = calculateTotals(gradeLevel)
+                      return (
+                        <React.Fragment key={gradeLevel}>
+                          <td className="border border-black p-1 text-center font-mono text-xs">{totals.sem1Avg}</td>
+                          <td className="border border-black p-1 text-center font-mono text-xs">{totals.sem2Avg}</td>
+                          <td className="border border-black p-1 text-center font-mono text-xs">{totals.yearAvgAvg}</td>
+                        </React.Fragment>
+                      )
+                    })}
+                  </tr>
+
+                  {/* Conduct Row */}
+                  <tr className="bg-green-100 font-bold">
+                    <td className="border border-black p-1 font-bold text-xs">CONDUCT</td>
+                    {gradeLevels.map((gradeLevel) => {
+                      const conduct = getConductData(gradeLevel)
+                      return (
+                        <React.Fragment key={gradeLevel}>
+                          <td className="border border-black p-1 text-center font-mono text-xs">{conduct.semester1}</td>
+                          <td className="border border-black p-1 text-center font-mono text-xs">{conduct.semester2}</td>
+                          <td className="border border-black p-1 text-center font-mono text-xs">{conduct.yearAvg}</td>
+                        </React.Fragment>
+                      )
+                    })}
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            {/* Summary */}
-            <div className="grid grid-cols-2 gap-8 mb-8">
+            {/* Footer - Compact */}
+            <div className="border-t border-black pt-2 mt-3 flex justify-between items-center text-xs">
               <div>
-                <h3 className="text-lg font-bold mb-3 border-b border-gray-400 pb-1">ACADEMIC SUMMARY</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="font-semibold">Total Subjects:</span>
-                    <span className="font-mono">{student.grades.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-semibold">Overall Average:</span>
-                    <span className="font-mono font-bold text-lg">{getOverallAverage()}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-semibold">Academic Status:</span>
-                    <span className="font-bold">{getGradeStatus(getOverallAverage())}</span>
-                  </div>
-                </div>
+                <div>Generated: {new Date().toLocaleDateString()}</div>
               </div>
-
-              <div>
-                <h3 className="text-lg font-bold mb-3 border-b border-gray-400 pb-1">GRADE DISTRIBUTION</h3>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>A Grades (90%+):</span>
-                    <span className="font-mono">{student.grades.filter((g) => g.average >= 90).length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>B Grades (80-89%):</span>
-                    <span className="font-mono">
-                      {student.grades.filter((g) => g.average >= 80 && g.average < 90).length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>C Grades (70-79%):</span>
-                    <span className="font-mono">
-                      {student.grades.filter((g) => g.average >= 70 && g.average < 80).length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>D Grades (60-69%):</span>
-                    <span className="font-mono">
-                      {student.grades.filter((g) => g.average >= 60 && g.average < 70).length}
-                    </span>
-                  </div>
-                </div>
+              <div className="text-center">
+                <div className="border-t border-black w-24 mb-1"></div>
+                <div>Authorized Signature</div>
               </div>
-            </div>
-
-            {/* Footer */}
-            <div className="border-t-2 border-black pt-4 mt-8">
-              <div className="flex justify-between items-end">
-                <div>
-                  <div className="text-sm text-gray-600">Generated on:</div>
-                  <div className="font-mono">{new Date().toLocaleDateString()}</div>
-                </div>
-                <div className="text-center">
-                  <div className="border-t border-black w-48 mb-2"></div>
-                  <div className="text-sm">Authorized Signature</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-600">Document ID:</div>
-                  <div className="font-mono text-xs">{student.id}</div>
-                </div>
+              <div className="text-right">
+                <div>ID: {student.id}</div>
               </div>
             </div>
           </div>
@@ -257,21 +298,20 @@ export function PrintPreview({ student }: PrintPreviewProps) {
             width: 100% !important;
             height: 100% !important;
             margin: 0 !important;
-            padding: 0.5in !important;
+            padding: 0.2in !important;
             box-shadow: none !important;
           }
           @page {
             size: landscape;
-            margin: 0.5in;
+            margin: 0.2in;
           }
         }
         .print-container {
           overflow-x: auto;
         }
         .transcript-page {
-          min-height: 8.5in;
-          font-family: "Times New Roman", serif;
-          line-height: 1.4;
+          font-family: "Arial", sans-serif;
+          line-height: 1.1;
         }
       `}</style>
     </div>
