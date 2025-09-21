@@ -6,29 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Save } from "lucide-react"
+import { Save, Download, Upload } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Student } from "@/app/page"
 
 interface GradesInputProps {
   student: Student
   onSave: (student: Student) => void
 }
-
-const PREDEFINED_SUBJECTS = [
-  "Amharic",
-  "English",
-  "Mathematics",
-  "Physics",
-  "Chemistry",
-  "Biology",
-  "Geography",
-  "History",
-  "Civics",
-  "Economics",
-  "Agriculture",
-  "HPE",
-  "ICT",
-]
 
 interface Grade {
   subject: string
@@ -38,8 +23,15 @@ interface Grade {
       semester2: number
       yearAvg: number
       total: number
-      conduct: string
     }
+  }
+}
+
+interface ConductData {
+  [gradeLevel: string]: {
+    semester1: string
+    semester2: string
+    yearAvg: string
   }
 }
 
@@ -48,6 +40,9 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
   console.log("[v0] Student grades data:", student?.grades)
 
   const inputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
+  const [isSaving, setIsSaving] = useState(false)
+  const [editableTotals, setEditableTotals] = useState<{ [key: string]: any }>({})
+  const [conduct, setConduct] = useState<ConductData>({})
 
   const getGradeLevels = (template: string): string[] => {
     switch (template) {
@@ -75,6 +70,16 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
     const gradeLevels = getGradeLevels(student.template)
     console.log("[v0] Grade levels for template:", gradeLevels)
 
+    const initialConduct: ConductData = {}
+    gradeLevels.forEach((level) => {
+      initialConduct[level] = {
+        semester1: "A",
+        semester2: "A",
+        yearAvg: "A",
+      }
+    })
+    setConduct(initialConduct)
+
     return PREDEFINED_SUBJECTS.map((subject) => {
       const existingGrade = student.grades?.find((g) => g.subject === subject)
       const grades: { [gradeLevel: string]: any } = {}
@@ -85,7 +90,6 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
           semester2: 0,
           yearAvg: 0,
           total: 0,
-          conduct: "Good",
         }
       })
 
@@ -133,68 +137,24 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
         return prev
       }
 
-      if (field === "conduct") {
-        updated[subjectIndex].grades[gradeLevel].conduct = value as string
-      } else {
-        const numValue = typeof value === "string" ? validateGrade(value) : value
-        updated[subjectIndex].grades[gradeLevel][field] = numValue
+      const numValue = typeof value === "string" ? validateGrade(value) : value
+      updated[subjectIndex].grades[gradeLevel][field] = numValue
 
-        // Auto-calculate year average and total with exact 2 decimal places
-        const sem1 = updated[subjectIndex].grades[gradeLevel].semester1
-        const sem2 = updated[subjectIndex].grades[gradeLevel].semester2
-        updated[subjectIndex].grades[gradeLevel].yearAvg = calculateYearAvg(sem1, sem2)
-        updated[subjectIndex].grades[gradeLevel].total = Number((sem1 + sem2).toFixed(2))
-      }
+      const sem1 = updated[subjectIndex].grades[gradeLevel].semester1
+      const sem2 = updated[subjectIndex].grades[gradeLevel].semester2
+      updated[subjectIndex].grades[gradeLevel].yearAvg = calculateYearAvg(sem1, sem2)
+      updated[subjectIndex].grades[gradeLevel].total = Number((sem1 + sem2).toFixed(2))
 
       return updated
     })
   }
 
-  const handleSave = (silent = false) => {
-    console.log("[v0] Saving grades for student:", student?.name)
-
-    try {
-      const updatedStudent: Student = {
-        ...student,
-        grades,
-      }
-      onSave(updatedStudent)
-      if (!silent) {
-        alert("Grades saved successfully!")
-      }
-    } catch (error) {
-      console.error("[v0] Error saving grades:", error)
-      if (!silent) {
-        alert("Error saving grades!")
-      }
-    }
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent, subjectIndex: number, gradeLevel: string, field: string) => {
-    if (e.key === "Enter") {
-      e.preventDefault()
-      handleSave(true) // Silent save without popup
-
-      // Move to next input in the same section
-      const currentKey = `${gradeLevel}-${subjectIndex}-${field}`
-      let nextKey = ""
-
-      if (field === "semester1") {
-        nextKey = `${gradeLevel}-${subjectIndex}-semester2`
-      } else if (field === "semester2") {
-        // Move to next subject's semester1 in same grade level
-        if (subjectIndex < PREDEFINED_SUBJECTS.length - 1) {
-          nextKey = `${gradeLevel}-${subjectIndex + 1}-semester1`
-        }
-      }
-
-      if (nextKey && inputRefs.current[nextKey]) {
-        setTimeout(() => {
-          inputRefs.current[nextKey]?.focus()
-          inputRefs.current[nextKey]?.select()
-        }, 100)
-      }
-    }
+  const updateEditableTotal = (gradeLevel: string, field: string, value: string) => {
+    const numValue = Number.parseFloat(value) || 0
+    setEditableTotals((prev) => ({
+      ...prev,
+      [`${gradeLevel}-${field}`]: numValue,
+    }))
   }
 
   const calculateGradeLevelTotals = (gradeLevel: string) => {
@@ -203,35 +163,145 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
       semester2: 0,
       yearAvg: 0,
       total: 0,
-      conductCounts: { Excellent: 0, Good: 0, Satisfactory: 0, "Needs Improvement": 0 },
     }
+
+    let subjectCount = 0
 
     grades.forEach((grade) => {
       const gradeData = grade.grades[gradeLevel]
-      if (gradeData) {
+      if (gradeData && (gradeData.semester1 > 0 || gradeData.semester2 > 0)) {
         totals.semester1 += gradeData.semester1
         totals.semester2 += gradeData.semester2
         totals.yearAvg += gradeData.yearAvg
         totals.total += gradeData.total
-        totals.conductCounts[gradeData.conduct as keyof typeof totals.conductCounts]++
+        subjectCount++
       }
     })
 
-    // Get most common conduct
-    const mostCommonConduct = Object.entries(totals.conductCounts).reduce((a, b) =>
-      totals.conductCounts[a[0] as keyof typeof totals.conductCounts] >
-      totals.conductCounts[b[0] as keyof typeof totals.conductCounts]
-        ? a
-        : b,
-    )[0]
-
-    return {
-      semester1: Number(totals.semester1.toFixed(2)),
-      semester2: Number(totals.semester2.toFixed(2)),
-      yearAvg: Number(totals.yearAvg.toFixed(2)),
-      total: Number(totals.total.toFixed(2)),
-      conduct: mostCommonConduct,
+    const finalTotals = {
+      semester1: editableTotals[`${gradeLevel}-semester1-total`] ?? Number(totals.semester1.toFixed(2)),
+      semester2: editableTotals[`${gradeLevel}-semester2-total`] ?? Number(totals.semester2.toFixed(2)),
+      yearAvg: editableTotals[`${gradeLevel}-yearAvg-total`] ?? Number(totals.yearAvg.toFixed(2)),
+      total: editableTotals[`${gradeLevel}-total-total`] ?? Number(totals.total.toFixed(2)),
+      semester1Avg:
+        editableTotals[`${gradeLevel}-semester1-avg`] ??
+        (subjectCount > 0 ? Number((totals.semester1 / subjectCount).toFixed(2)) : 0),
+      semester2Avg:
+        editableTotals[`${gradeLevel}-semester2-avg`] ??
+        (subjectCount > 0 ? Number((totals.semester2 / subjectCount).toFixed(2)) : 0),
+      yearAvgAvg:
+        editableTotals[`${gradeLevel}-yearAvg-avg`] ??
+        (subjectCount > 0 ? Number((totals.yearAvg / subjectCount).toFixed(2)) : 0),
+      subjectCount,
     }
+
+    return finalTotals
+  }
+
+  const PREDEFINED_SUBJECTS = [
+    "Amharic",
+    "English",
+    "Mathematics",
+    "Physics",
+    "Chemistry",
+    "Biology",
+    "Geography",
+    "History",
+    "Civics",
+    "Economics",
+    "Agriculture",
+    "HPE",
+    "ICT",
+  ]
+
+  const handleKeyPress = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    index: number,
+    gradeLevel: string,
+    field: string,
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      const value = (e.target as HTMLInputElement).value
+      updateGrade(index, gradeLevel, field, value)
+
+      const nextIndex = index + 1
+      if (nextIndex < grades.length) {
+        const nextInputKey = `${gradeLevel}-${nextIndex}-${field}`
+        const nextInput = inputRefs.current[nextInputKey]
+        if (nextInput) {
+          nextInput.focus()
+          nextInput.select()
+        }
+      }
+    }
+  }
+
+  const handleExport = () => {
+    const exportData = {
+      student: student,
+      grades: grades,
+      conduct: conduct,
+      exportDate: new Date().toISOString(),
+    }
+
+    const dataStr = JSON.stringify(exportData, null, 2)
+    const dataBlob = new Blob([dataStr], { type: "application/json" })
+    const url = URL.createObjectURL(dataBlob)
+
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${student.name.replace(/\s+/g, "_")}_grades_${new Date().toISOString().split("T")[0]}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const importData = JSON.parse(e.target?.result as string)
+        if (importData.grades) {
+          setGrades(importData.grades)
+        }
+        if (importData.conduct) {
+          setConduct(importData.conduct)
+        }
+        if (importData.student) {
+          onSave({ ...importData.student, grades: importData.grades })
+        }
+      } catch (error) {
+        console.error("[v0] Error importing data:", error)
+        alert("Error importing file. Please check the file format.")
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const updateConduct = (gradeLevel: string, field: string, value: string) => {
+    setConduct((prev) => ({
+      ...prev,
+      [gradeLevel]: {
+        ...prev[gradeLevel],
+        [field]: value,
+      },
+    }))
+  }
+
+  const handleSave = (isPartial: boolean) => {
+    setIsSaving(true)
+    const updatedStudent = {
+      ...student,
+      grades,
+      conduct: conduct,
+    }
+    onSave(updatedStudent)
+    setIsSaving(false)
   }
 
   if (!student) {
@@ -261,7 +331,30 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Grades for {student.name}</span>
-          <div className="text-sm text-muted-foreground">Template: {student.template}</div>
+          <div className="flex items-center gap-2">
+            <div className="text-sm text-muted-foreground">Template: {student.template}</div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExport}
+                className="flex items-center gap-1 bg-transparent"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => document.getElementById("import-file")?.click()}
+                className="flex items-center gap-1"
+              >
+                <Upload className="w-4 h-4" />
+                Import
+              </Button>
+              <input id="import-file" type="file" accept=".json" onChange={handleImport} style={{ display: "none" }} />
+            </div>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -280,8 +373,6 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
                       <TableHead className="text-center">Sem 1</TableHead>
                       <TableHead className="text-center">Sem 2</TableHead>
                       <TableHead className="text-center">Year Avg</TableHead>
-                      <TableHead className="text-center">Total</TableHead>
-                      <TableHead className="text-center">Conduct</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -320,36 +411,139 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
                             placeholder="0.00"
                           />
                         </TableCell>
-                        <TableCell className="text-center font-mono font-semibold">
-                          {grade.grades[gradeLevel]?.yearAvg > 0
-                            ? `${grade.grades[gradeLevel].yearAvg.toFixed(2)}`
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-center font-mono">
-                          {grade.grades[gradeLevel]?.total > 0 ? grade.grades[gradeLevel].total.toFixed(2) : "-"}
-                        </TableCell>
                         <TableCell>
-                          <select
-                            value={grade.grades[gradeLevel]?.conduct || "Good"}
-                            onChange={(e) => updateGrade(index, gradeLevel, "conduct", e.target.value)}
-                            className="w-full p-1 border rounded text-center"
-                          >
-                            <option value="Excellent">Excellent</option>
-                            <option value="Good">Good</option>
-                            <option value="Satisfactory">Satisfactory</option>
-                            <option value="Needs Improvement">Needs Improvement</option>
-                          </select>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={grade.grades[gradeLevel]?.yearAvg || ""}
+                            onChange={(e) => updateGrade(index, gradeLevel, "yearAvg", e.target.value)}
+                            className="text-center border-0 p-2 focus:ring-1 font-mono font-semibold"
+                            placeholder="0.00"
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
 
                     <TableRow className="bg-muted/50 font-semibold border-t-2">
                       <TableCell className="font-bold">TOTALS</TableCell>
-                      <TableCell className="text-center font-mono">{levelTotals.semester1.toFixed(2)}</TableCell>
-                      <TableCell className="text-center font-mono">{levelTotals.semester2.toFixed(2)}</TableCell>
-                      <TableCell className="text-center font-mono">{levelTotals.yearAvg.toFixed(2)}</TableCell>
-                      <TableCell className="text-center font-mono">{levelTotals.total.toFixed(2)}</TableCell>
-                      <TableCell className="text-center">{levelTotals.conduct}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={levelTotals.semester1}
+                          onChange={(e) => updateEditableTotal(gradeLevel, "semester1-total", e.target.value)}
+                          className="text-center border-0 p-2 focus:ring-1 font-mono font-semibold bg-transparent"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={levelTotals.semester2}
+                          onChange={(e) => updateEditableTotal(gradeLevel, "semester2-total", e.target.value)}
+                          className="text-center border-0 p-2 focus:ring-1 font-mono font-semibold bg-transparent"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={levelTotals.yearAvg}
+                          onChange={(e) => updateEditableTotal(gradeLevel, "yearAvg-total", e.target.value)}
+                          className="text-center border-0 p-2 focus:ring-1 font-mono font-semibold bg-transparent"
+                        />
+                      </TableCell>
+                    </TableRow>
+
+                    <TableRow className="bg-blue-50 font-semibold">
+                      <TableCell className="font-bold">AVERAGES</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={levelTotals.semester1Avg}
+                          onChange={(e) => updateEditableTotal(gradeLevel, "semester1-avg", e.target.value)}
+                          className="text-center border-0 p-2 focus:ring-1 font-mono font-semibold bg-transparent"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={levelTotals.semester2Avg}
+                          onChange={(e) => updateEditableTotal(gradeLevel, "semester2-avg", e.target.value)}
+                          className="text-center border-0 p-2 focus:ring-1 font-mono font-semibold bg-transparent"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={levelTotals.yearAvgAvg}
+                          onChange={(e) => updateEditableTotal(gradeLevel, "yearAvg-avg", e.target.value)}
+                          className="text-center border-0 p-2 focus:ring-1 font-mono font-semibold bg-transparent"
+                        />
+                      </TableCell>
+                    </TableRow>
+
+                    <TableRow className="bg-green-50 font-semibold">
+                      <TableCell className="font-bold">CONDUCT</TableCell>
+                      <TableCell>
+                        <Select
+                          value={conduct[gradeLevel]?.semester1 || "A"}
+                          onValueChange={(value) => updateConduct(gradeLevel, "semester1", value)}
+                        >
+                          <SelectTrigger className="text-center border-0 p-2 focus:ring-1 font-mono font-semibold bg-transparent">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="A">A</SelectItem>
+                            <SelectItem value="B">B</SelectItem>
+                            <SelectItem value="C">C</SelectItem>
+                            <SelectItem value="D">D</SelectItem>
+                            <SelectItem value="E">E</SelectItem>
+                            <SelectItem value="F">F</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={conduct[gradeLevel]?.semester2 || "A"}
+                          onValueChange={(value) => updateConduct(gradeLevel, "semester2", value)}
+                        >
+                          <SelectTrigger className="text-center border-0 p-2 focus:ring-1 font-mono font-semibold bg-transparent">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="A">A</SelectItem>
+                            <SelectItem value="B">B</SelectItem>
+                            <SelectItem value="C">C</SelectItem>
+                            <SelectItem value="D">D</SelectItem>
+                            <SelectItem value="E">E</SelectItem>
+                            <SelectItem value="F">F</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={conduct[gradeLevel]?.yearAvg || "A"}
+                          onValueChange={(value) => updateConduct(gradeLevel, "yearAvg", value)}
+                        >
+                          <SelectTrigger className="text-center border-0 p-2 focus:ring-1 font-mono font-semibold bg-transparent">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="A">A</SelectItem>
+                            <SelectItem value="B">B</SelectItem>
+                            <SelectItem value="C">C</SelectItem>
+                            <SelectItem value="D">D</SelectItem>
+                            <SelectItem value="E">E</SelectItem>
+                            <SelectItem value="F">F</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -358,7 +552,6 @@ export function GradesInput({ student, onSave }: GradesInputProps) {
           )
         })}
 
-        {/* Save Button */}
         <div className="flex justify-end pt-4 border-t">
           <Button onClick={() => handleSave(false)} className="flex items-center gap-2">
             <Save className="w-4 h-4" />
